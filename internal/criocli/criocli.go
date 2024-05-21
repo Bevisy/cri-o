@@ -830,6 +830,11 @@ func getCrioFlags(defConf *libconfig.Config) []cli.Flag {
 			Usage:   "Port for the pprof profiler.",
 			EnvVars: []string{"CONTAINER_PROFILE_PORT"},
 		},
+		&cli.StringFlag{
+			Name:    "profile-address",
+			Usage:   "Address for the pprof profiler.",
+			EnvVars: []string{"CONTAINER_PROFILE_ADDRESS"},
+		},
 		&cli.BoolFlag{
 			Name:    "enable-profile-unix-socket",
 			Usage:   "Enable pprof profiler on crio unix domain socket.",
