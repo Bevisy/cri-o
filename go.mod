@@ -42,6 +42,7 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/google/renameio v1.0.1
 	github.com/google/uuid v1.6.0
+	github.com/grafana/pyroscope-go/godeltaprof v0.1.7
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/intel/goresctrl v0.7.0
 	github.com/json-iterator/go v1.1.12
