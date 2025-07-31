@@ -4,12 +4,13 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/containers/storage/pkg/truncindex"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	types "k8s.io/cri-api/pkg/apis/runtime/v1"
 
+	"github.com/containers/common/pkg/cgroups"
+	"github.com/containers/storage/pkg/truncindex"
 	"github.com/cri-o/cri-o/internal/log"
 	"github.com/cri-o/cri-o/internal/oci"
 	"github.com/cri-o/cri-o/internal/runtimehandlerhooks"
@@ -61,6 +62,13 @@ func (s *Server) stopContainer(ctx context.Context, ctr *oci.Container, timeout 
 		return fmt.Errorf("failed to stop container %s: %w", ctr.ID(), err)
 	}
 
+	// Clean up container cgroup for cgroupfs manager
+	if !s.config.CgroupManager().IsSystemd() {
+		if err := s.cleanupContainerCgroup(ctx, ctr); err != nil {
+			log.Warnf(ctx, "Failed to cleanup container cgroup for %s: %v", ctr.ID(), err)
+		}
+	}
+
 	if err := s.StorageRuntimeServer().StopContainer(ctx, ctr.ID()); err != nil {
 		return fmt.Errorf("failed to unmount container %s: %w", ctr.ID(), err)
 	}
@@ -80,5 +88,47 @@ func (s *Server) stopContainer(ctx context.Context, ctr *oci.Container, timeout 
 		return err
 	}
 
+	return nil
+}
+
+// cleanupContainerCgroup cleans up the container's cgroup when using cgroupfs manager
+func (s *Server) cleanupContainerCgroup(ctx context.Context, ctr *oci.Container) error {
+	ctx, span := log.StartSpan(ctx)
+	defer span.End()
+
+	// Get the sandbox to access cgroup parent
+	sb := s.getSandbox(ctx, ctr.Sandbox())
+	if sb == nil {
+		return fmt.Errorf("failed to get sandbox for container %s", ctr.ID())
+	}
+
+	// Get container cgroup path
+	cgroupPath := s.config.CgroupManager().ContainerCgroupPath(sb.CgroupParent(), ctr.ID())
+	if cgroupPath == "" {
+		return nil
+	}
+
+	// Load and delete the cgroup
+	cg, err := cgroups.Load(cgroupPath)
+	if err != nil {
+		// If cgroup doesn't exist, it's already cleaned up
+		if err == cgroups.ErrCgroupDeleted {
+			return nil
+		}
+		return fmt.Errorf("failed to load container cgroup %s: %w", cgroupPath, err)
+	}
+
+	if err := cg.Delete(); err != nil {
+		// If cgroup is already deleted, ignore the error
+		if err == cgroups.ErrCgroupDeleted {
+			return nil
+		}
+		return fmt.Errorf("failed to delete container cgroup %s: %w", cgroupPath, err)
+	}
+
+	// Remove the container cgroup manager from cache
+	s.config.CgroupManager().RemoveContainerCgManager(ctr.ID())
+
+	log.Debugf(ctx, "Successfully cleaned up container cgroup: %s", cgroupPath)
 	return nil
 }
