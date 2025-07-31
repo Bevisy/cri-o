@@ -10,6 +10,7 @@ like: `* `
 
 ## Release Notes
 
+- [v1.34.0](v1.34.0.md)
 - [v1.31.0](v1.31.0.md)
 - [a2f40713db5d7bc8d38163aa651d773709e5208e](a2f40713db5d7bc8d38163aa651d773709e5208e.md)
 - [8afd5c2ddb501ae5b75f5a8035d2f595c24e9345](8afd5c2ddb501ae5b75f5a8035d2f595c24e9345.md)
